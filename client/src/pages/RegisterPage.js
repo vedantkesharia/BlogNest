@@ -61,6 +61,8 @@ export default function RegisterPage() {
             aria-describedby="emailHelp"
             value={username}
             onChange={(ev) => setUsername(ev.target.value)}
+            minLength={4}
+          required
           />
           <div id="emailHelp" className="form-text">
             We'll never share your email with anyone else.
@@ -76,18 +78,20 @@ export default function RegisterPage() {
             id="exampleInputPassword1"
             value={password}
             onChange={(ev) => setPassword(ev.target.value)}
+            minLength={4}
+          required
           />
         </div>
-        <div className="mb-3 form-check">
+        {/* <div className="mb-3 form-check">
           <input
             type="checkbox"
             className="form-check-input"
-            id="exampleCheck1"
+            // id="exampleCheck1"
           />
           <label className="form-check-label" for="exampleCheck1">
             Check me out
           </label>
-        </div>
+        </div> */}
         <button
           style={{
             alignItems: "center",
