@@ -46,7 +46,7 @@ export default function RegisterPage() {
           textAlign: "center",
         }}
       >
-        Register Page!
+        Register Here!
       </div>
       
       <form onSubmit={register}>
@@ -65,7 +65,7 @@ export default function RegisterPage() {
           required
           />
           <div id="emailHelp" className="form-text">
-            We'll never share your email with anyone else.
+            We'll never share your username with anyone else.
           </div>
         </div>
         <div className="mb-3">
