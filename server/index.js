@@ -12,6 +12,7 @@ import fs from 'fs';
 // import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import {GridFSBucket, ObjectId } from 'mongodb';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -76,53 +77,124 @@ app.post('/logout', (req,res) => {
   res.cookie('token', '').json('ok');
 });
 
-// app.post('/post', uploadMiddleware.single('file'), async (req, res) => {
-//   let newPath = null;
-//   if (req.file) {
-//     const { originalname, path } = req.file;
-//     const parts = originalname.split('.');
-//     const ext = parts[parts.length - 1];
-//     newPath = path + '.' + ext;
-//     fs.renameSync(path, newPath);
-//   }
 
-//   const { token } = req.cookies;
-//   jwt.verify(token, process.env.REACT_APP_SECRET, {}, async (err, info) => {
+const bucket = new GridFSBucket(mongoose.connection.db, {
+  bucketName: 'uploads',
+});
+
+app.post('/post', uploadMiddleware.single('file'), async (req, res) => {
+  const { originalname, path } = req.file;
+  const parts = originalname.split('.');
+  const ext = parts[parts.length - 1];
+
+  const uploadStream = bucket.openUploadStream(`${req.file.filename}.${ext}`);
+  const readStream = fs.createReadStream(path);
+  readStream.pipe(uploadStream);
+
+  uploadStream.on('error', (error) => {
+    fs.unlinkSync(path); // Delete the local file if an error occurs during upload
+    return res.status(500).json('Failed to upload file to MongoDB');
+  });
+
+  uploadStream.on('finish', async (file) => {
+    fs.unlinkSync(path); // Delete the local file after successful upload
+
+    const { token } = req.cookies;
+    jwt.verify(token, process.env.REACT_APP_SECRET, {}, async (err, info) => {
+      if (err) throw err;
+
+      const { title, summary, content } = req.body;
+      const postDoc = await Post.create({
+        title,
+        summary,
+        content,
+        cover: file._id, // Store the GridFS file ID as the cover value
+        author: info.id,
+      });
+
+      res.json(postDoc);
+    });
+  });
+});
+
+app.put('/post', uploadMiddleware.single('file'), async (req, res) => {
+  let fileId = null;
+
+  if (req.file) {
+    const { originalname, path } = req.file;
+    const parts = originalname.split('.');
+    const ext = parts[parts.length - 1];
+
+    const uploadStream = bucket.openUploadStream(`${req.file.filename}.${ext}`);
+    const readStream = fs.createReadStream(path);
+    readStream.pipe(uploadStream);
+
+    uploadStream.on('error', (error) => {
+      fs.unlinkSync(path); // Delete the local file if an error occurs during upload
+      return res.status(500).json('Failed to upload file to MongoDB');
+    });
+
+    uploadStream.on('finish', (file) => {
+      fs.unlinkSync(path); // Delete the local file after successful upload
+      fileId = file._id; // Store the GridFS file ID for later use
+
+      updatePost(req, res, fileId);
+    });
+  } else {
+    updatePost(req, res, fileId);
+  }
+});
+
+async function updatePost(req, res, fileId) {
+  const { token } = req.cookies;
+  jwt.verify(token, process.env.REACT_APP_SECRET, {}, async (err, info) => {
+    if (err) throw err;
+
+    const { id, title, summary, content } = req.body;
+    const filter = { _id: id };
+    const update = {
+      title,
+      summary,
+      content,
+    };
+
+    if (fileId) {
+      update.cover = fileId; // Update the cover field with the new GridFS file ID
+    }
+
+    const options = { new: true }; // Return the updated document
+
+    const updatedPost = await Post.findByIdAndUpdate(filter, update, options);
+
+    if (!updatedPost) {
+      return res.status(400).json('Post not found');
+    }
+
+    res.json(updatedPost);
+  });
+}
+
+// app.post('/post', uploadMiddleware.single('file'), async (req,res) => {
+//   const {originalname,path} = req.file;
+//   const parts = originalname.split('.');
+//   const ext = parts[parts.length - 1];
+//   const newPath = path+'.'+ext;
+//   fs.renameSync(path, newPath);
+
+//   const {token} = req.cookies;
+//   jwt.verify(token, process.env.REACT_APP_SECRET, {}, async (err,info) => {
 //     if (err) throw err;
-
-//     const { id, title, summary, content } = req.body;
-
-//     if (id) {
-//       // Update existing post
-//       const filter = { _id: id };
-//       const update = {
-//         title,
-//         summary,
-//         content,
-//         cover: newPath ? newPath : null, // Set to null if no new file uploaded
-//       };
-//       const options = { new: true }; // Return the updated document
-
-//       const updatedPost = await Post.findByIdAndUpdate(filter, update, options);
-
-//       if (!updatedPost) {
-//         return res.status(400).json('Post not found');
-//       }
-
-//       res.json(updatedPost);
-//     } else {
-//       // Create new post
-//       const postDoc = await Post.create({
-//         title,
-//         summary,
-//         content,
-//         cover: newPath,
-//         author: info.id,
-//       });
-
-//       res.json(postDoc);
-//     }
+//     const {title,summary,content} = req.body;
+//     const postDoc = await Post.create({
+//       title,
+//       summary,
+//       content,
+//       cover:newPath,
+//       author:info.id,
+//     });
+//     res.json(postDoc);
 //   });
+
 // });
 
 // app.put('/post', uploadMiddleware.single('file'), async (req, res) => {
@@ -144,7 +216,7 @@ app.post('/logout', (req,res) => {
 //       title,
 //       summary,
 //       content,
-//       cover: newPath ? newPath : null, // Set to null if no new file uploaded
+//       cover: newPath ? newPath : postDoc.cover,
 //     };
 //     const options = { new: true }; // Return the updated document
 
@@ -159,95 +231,6 @@ app.post('/logout', (req,res) => {
 // });
 
 
-app.post('/post', uploadMiddleware.single('file'), async (req,res) => {
-  const {originalname,path} = req.file;
-  const parts = originalname.split('.');
-  const ext = parts[parts.length - 1];
-  const newPath = path+'.'+ext;
-  fs.renameSync(path, newPath);
-
-  const {token} = req.cookies;
-  jwt.verify(token, process.env.REACT_APP_SECRET, {}, async (err,info) => {
-    if (err) throw err;
-    const {title,summary,content} = req.body;
-    const postDoc = await Post.create({
-      title,
-      summary,
-      content,
-      cover:newPath,
-      author:info.id,
-    });
-    res.json(postDoc);
-  });
-
-});
-
-app.put('/post', uploadMiddleware.single('file'), async (req, res) => {
-  let newPath = null;
-  if (req.file) {
-    const { originalname, path } = req.file;
-    const parts = originalname.split('.');
-    const ext = parts[parts.length - 1];
-    newPath = path + '.' + ext;
-    fs.renameSync(path, newPath);
-  }
-
-  const { token } = req.cookies;
-  jwt.verify(token, process.env.REACT_APP_SECRET, {}, async (err, info) => {
-    if (err) throw err;
-    const { id, title, summary, content } = req.body;
-    const filter = { _id: id };
-    const update = {
-      title,
-      summary,
-      content,
-      cover: newPath ? newPath : postDoc.cover,
-    };
-    const options = { new: true }; // Return the updated document
-
-    const updatedPost = await Post.findByIdAndUpdate(filter, update, options);
-
-    if (!updatedPost) {
-      return res.status(400).json('Post not found');
-    }
-
-    res.json(updatedPost);
-  });
-});
-
-// app.put('/post',uploadMiddleware.single('file'), async (req,res) => {
- 
-//   let newPath = null;
-//   if (req.file) {
-//     const {originalname,path} = req.file;
-//     const parts = originalname.split('.');
-//     const ext = parts[parts.length - 1];
-//     newPath = path+'.'+ext;
-//     fs.renameSync(path, newPath);
-//   }
-
-//   const {token} = req.cookies;
-//   jwt.verify(token, process.env.REACT_APP_SECRET, {}, async (err,info) => {
-    
-//     if (err) throw err;
-//     const {id,title,summary,content} = req.body;
-//     const postDoc = await Post.findById(id);
-//     const isAuthor = JSON.stringify(postDoc.author) === JSON.stringify(info.id);
-//     if (!isAuthor) {
-//       return res.status(400).json('you are not the author');
-//     }
-//     await postDoc.update({
-//       title,
-//       summary,
-//       content,
-//       cover: newPath ? newPath : postDoc.cover,
-//     });
-
-//     res.json(postDoc);
-//   });
-
-
-// });
 
 
 app.get('/post', async (req,res) => {
