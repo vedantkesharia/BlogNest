@@ -76,110 +76,53 @@ app.post('/logout', (req,res) => {
   res.cookie('token', '').json('ok');
 });
 
-app.post('/post', uploadMiddleware.single('file'), async (req, res) => {
-  let newPath = null;
-  if (req.file) {
-    const { originalname, path } = req.file;
-    const parts = originalname.split('.');
-    const ext = parts[parts.length - 1];
-    newPath = path + '.' + ext;
-    fs.renameSync(path, newPath);
-  }
+// app.post('/post', uploadMiddleware.single('file'), async (req, res) => {
+//   let newPath = null;
+//   if (req.file) {
+//     const { originalname, path } = req.file;
+//     const parts = originalname.split('.');
+//     const ext = parts[parts.length - 1];
+//     newPath = path + '.' + ext;
+//     fs.renameSync(path, newPath);
+//   }
 
-  const { token } = req.cookies;
-  jwt.verify(token, process.env.REACT_APP_SECRET, {}, async (err, info) => {
-    if (err) throw err;
-
-    const { id, title, summary, content } = req.body;
-
-    if (id) {
-      // Update existing post
-      const filter = { _id: id };
-      const update = {
-        title,
-        summary,
-        content,
-        cover: newPath ? newPath : null, // Set to null if no new file uploaded
-      };
-      const options = { new: true }; // Return the updated document
-
-      const updatedPost = await Post.findByIdAndUpdate(filter, update, options);
-
-      if (!updatedPost) {
-        return res.status(400).json('Post not found');
-      }
-
-      res.json(updatedPost);
-    } else {
-      // Create new post
-      const postDoc = await Post.create({
-        title,
-        summary,
-        content,
-        cover: newPath,
-        author: info.id,
-      });
-
-      res.json(postDoc);
-    }
-  });
-});
-
-app.put('/post', uploadMiddleware.single('file'), async (req, res) => {
-  let newPath = null;
-  if (req.file) {
-    const { originalname, path } = req.file;
-    const parts = originalname.split('.');
-    const ext = parts[parts.length - 1];
-    newPath = path + '.' + ext;
-    fs.renameSync(path, newPath);
-  }
-
-  const { token } = req.cookies;
-  jwt.verify(token, process.env.REACT_APP_SECRET, {}, async (err, info) => {
-    if (err) throw err;
-    const { id, title, summary, content } = req.body;
-    const filter = { _id: id };
-    const update = {
-      title,
-      summary,
-      content,
-      cover: newPath ? newPath : null, // Set to null if no new file uploaded
-    };
-    const options = { new: true }; // Return the updated document
-
-    const updatedPost = await Post.findByIdAndUpdate(filter, update, options);
-
-    if (!updatedPost) {
-      return res.status(400).json('Post not found');
-    }
-
-    res.json(updatedPost);
-  });
-});
-
-
-// app.post('/post', uploadMiddleware.single('file'), async (req,res) => {
-//   const {originalname,path} = req.file;
-//   const parts = originalname.split('.');
-//   const ext = parts[parts.length - 1];
-//   const newPath = path+'.'+ext;
-//   fs.renameSync(path, newPath);
-
-//   const {token} = req.cookies;
-//   jwt.verify(token, process.env.REACT_APP_SECRET, {}, async (err,info) => {
+//   const { token } = req.cookies;
+//   jwt.verify(token, process.env.REACT_APP_SECRET, {}, async (err, info) => {
 //     if (err) throw err;
-//     const {title,summary,content} = req.body;
-//     const postDoc = await Post.create({
-//       title,
-//       summary,
-//       content,
-//       cover:newPath,
-//       author:info.id,
-//     });
-//     res.json(postDoc);
-//   });
 
+//     const { id, title, summary, content } = req.body;
+
+//     if (id) {
+//       // Update existing post
+//       const filter = { _id: id };
+//       const update = {
+//         title,
+//         summary,
+//         content,
+//         cover: newPath ? newPath : null, // Set to null if no new file uploaded
+//       };
+//       const options = { new: true }; // Return the updated document
+
+//       const updatedPost = await Post.findByIdAndUpdate(filter, update, options);
+
+//       if (!updatedPost) {
+//         return res.status(400).json('Post not found');
+//       }
+
+//       res.json(updatedPost);
+//     } else {
+//       // Create new post
+//       const postDoc = await Post.create({
+//         title,
+//         summary,
+//         content,
+//         cover: newPath,
+//         author: info.id,
+//       });
+
+//       res.json(postDoc);
+//     }
+//   });
 // });
 
 // app.put('/post', uploadMiddleware.single('file'), async (req, res) => {
@@ -201,7 +144,7 @@ app.put('/post', uploadMiddleware.single('file'), async (req, res) => {
 //       title,
 //       summary,
 //       content,
-//       cover: newPath ? newPath : postDoc.cover,
+//       cover: newPath ? newPath : null, // Set to null if no new file uploaded
 //     };
 //     const options = { new: true }; // Return the updated document
 
@@ -214,6 +157,63 @@ app.put('/post', uploadMiddleware.single('file'), async (req, res) => {
 //     res.json(updatedPost);
 //   });
 // });
+
+
+app.post('/post', uploadMiddleware.single('file'), async (req,res) => {
+  const {originalname,path} = req.file;
+  const parts = originalname.split('.');
+  const ext = parts[parts.length - 1];
+  const newPath = path+'.'+ext;
+  fs.renameSync(path, newPath);
+
+  const {token} = req.cookies;
+  jwt.verify(token, process.env.REACT_APP_SECRET, {}, async (err,info) => {
+    if (err) throw err;
+    const {title,summary,content} = req.body;
+    const postDoc = await Post.create({
+      title,
+      summary,
+      content,
+      cover:newPath,
+      author:info.id,
+    });
+    res.json(postDoc);
+  });
+
+});
+
+app.put('/post', uploadMiddleware.single('file'), async (req, res) => {
+  let newPath = null;
+  if (req.file) {
+    const { originalname, path } = req.file;
+    const parts = originalname.split('.');
+    const ext = parts[parts.length - 1];
+    newPath = path + '.' + ext;
+    fs.renameSync(path, newPath);
+  }
+
+  const { token } = req.cookies;
+  jwt.verify(token, process.env.REACT_APP_SECRET, {}, async (err, info) => {
+    if (err) throw err;
+    const { id, title, summary, content } = req.body;
+    const filter = { _id: id };
+    const update = {
+      title,
+      summary,
+      content,
+      cover: newPath ? newPath : postDoc.cover,
+    };
+    const options = { new: true }; // Return the updated document
+
+    const updatedPost = await Post.findByIdAndUpdate(filter, update, options);
+
+    if (!updatedPost) {
+      return res.status(400).json('Post not found');
+    }
+
+    res.json(updatedPost);
+  });
+});
 
 // app.put('/post',uploadMiddleware.single('file'), async (req,res) => {
  
