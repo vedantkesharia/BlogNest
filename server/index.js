@@ -12,7 +12,6 @@ import fs from 'fs';
 // import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import {GridFSBucket, ObjectId } from 'mongodb';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -25,7 +24,7 @@ dotenv.config();
 
 const salt = bcrypt.genSaltSync(10);
 
-app.use(cors({ credentials: true, origin: 'https://theblognest.netlify.app' }));
+app.use(cors({ credentials: true, origin: 'http://localhost:3000' }));
 app.use(express.json());
 app.use(cookieParser());
 // app.use('/uploads', express.static(__dirname + '/uploads'));
@@ -78,90 +77,52 @@ app.post('/logout', (req,res) => {
 });
 
 
-const bucket = new GridFSBucket(mongoose.connection.db, {
-  bucketName: 'uploads',
-});
 
-app.post('/post', uploadMiddleware.single('file'), async (req, res) => {
-  const { originalname, path } = req.file;
+
+app.post('/post', uploadMiddleware.single('file'), async (req,res) => {
+  const {originalname,path} = req.file;
   const parts = originalname.split('.');
   const ext = parts[parts.length - 1];
+  const newPath = path+'.'+ext;
+  fs.renameSync(path, newPath);
 
-  const uploadStream = bucket.openUploadStream(`${req.file.filename}.${ext}`);
-  const readStream = fs.createReadStream(path);
-  readStream.pipe(uploadStream);
-
-  uploadStream.on('error', (error) => {
-    fs.unlinkSync(path); // Delete the local file if an error occurs during upload
-    return res.status(500).json('Failed to upload file to MongoDB');
-  });
-
-  uploadStream.on('finish', async (file) => {
-    fs.unlinkSync(path); // Delete the local file after successful upload
-
-    const { token } = req.cookies;
-    jwt.verify(token, process.env.REACT_APP_SECRET, {}, async (err, info) => {
-      if (err) throw err;
-
-      const { title, summary, content } = req.body;
-      const postDoc = await Post.create({
-        title,
-        summary,
-        content,
-        cover: file._id, // Store the GridFS file ID as the cover value
-        author: info.id,
-      });
-
-      res.json(postDoc);
+  const {token} = req.cookies;
+  jwt.verify(token, process.env.REACT_APP_SECRET, {}, async (err,info) => {
+    if (err) throw err;
+    const {title,summary,content} = req.body;
+    const postDoc = await Post.create({
+      title,
+      summary,
+      content,
+      cover:newPath,
+      author:info.id,
     });
+    res.json(postDoc);
   });
+
 });
 
 app.put('/post', uploadMiddleware.single('file'), async (req, res) => {
-  let fileId = null;
-
+  let newPath = null;
   if (req.file) {
     const { originalname, path } = req.file;
     const parts = originalname.split('.');
     const ext = parts[parts.length - 1];
-
-    const uploadStream = bucket.openUploadStream(`${req.file.filename}.${ext}`);
-    const readStream = fs.createReadStream(path);
-    readStream.pipe(uploadStream);
-
-    uploadStream.on('error', (error) => {
-      fs.unlinkSync(path); // Delete the local file if an error occurs during upload
-      return res.status(500).json('Failed to upload file to MongoDB');
-    });
-
-    uploadStream.on('finish', (file) => {
-      fs.unlinkSync(path); // Delete the local file after successful upload
-      fileId = file._id; // Store the GridFS file ID for later use
-
-      updatePost(req, res, fileId);
-    });
-  } else {
-    updatePost(req, res, fileId);
+    newPath = path + '.' + ext;
+    fs.renameSync(path, newPath);
   }
-});
 
-async function updatePost(req, res, fileId) {
   const { token } = req.cookies;
   jwt.verify(token, process.env.REACT_APP_SECRET, {}, async (err, info) => {
     if (err) throw err;
-
     const { id, title, summary, content } = req.body;
     const filter = { _id: id };
     const update = {
       title,
       summary,
       content,
+      cover: newPath ? newPath : postDoc.cover,
     };
-
-    if (fileId) {
-      update.cover = fileId; // Update the cover field with the new GridFS file ID
-    }
-
     const options = { new: true }; // Return the updated document
 
     const updatedPost = await Post.findByIdAndUpdate(filter, update, options);
@@ -172,63 +133,7 @@ async function updatePost(req, res, fileId) {
 
     res.json(updatedPost);
   });
-}
-
-// app.post('/post', uploadMiddleware.single('file'), async (req,res) => {
-//   const {originalname,path} = req.file;
-//   const parts = originalname.split('.');
-//   const ext = parts[parts.length - 1];
-//   const newPath = path+'.'+ext;
-//   fs.renameSync(path, newPath);
-
-//   const {token} = req.cookies;
-//   jwt.verify(token, process.env.REACT_APP_SECRET, {}, async (err,info) => {
-//     if (err) throw err;
-//     const {title,summary,content} = req.body;
-//     const postDoc = await Post.create({
-//       title,
-//       summary,
-//       content,
-//       cover:newPath,
-//       author:info.id,
-//     });
-//     res.json(postDoc);
-//   });
-
-// });
-
-// app.put('/post', uploadMiddleware.single('file'), async (req, res) => {
-//   let newPath = null;
-//   if (req.file) {
-//     const { originalname, path } = req.file;
-//     const parts = originalname.split('.');
-//     const ext = parts[parts.length - 1];
-//     newPath = path + '.' + ext;
-//     fs.renameSync(path, newPath);
-//   }
-
-//   const { token } = req.cookies;
-//   jwt.verify(token, process.env.REACT_APP_SECRET, {}, async (err, info) => {
-//     if (err) throw err;
-//     const { id, title, summary, content } = req.body;
-//     const filter = { _id: id };
-//     const update = {
-//       title,
-//       summary,
-//       content,
-//       cover: newPath ? newPath : postDoc.cover,
-//     };
-//     const options = { new: true }; // Return the updated document
-
-//     const updatedPost = await Post.findByIdAndUpdate(filter, update, options);
-
-//     if (!updatedPost) {
-//       return res.status(400).json('Post not found');
-//     }
-
-//     res.json(updatedPost);
-//   });
-// });
+});
 
 
 
@@ -269,7 +174,7 @@ app.listen(4000);
 // import dotenv from "dotenv";
 // import cookieParser from 'cookie-parser';
 // import multer from 'multer';
-// import fs from 'fs';
+// import fs from 'fs';       
 // const uploadMiddleware = multer({dest:'uploads/'});
 // const app = express();
 // dotenv.config();
