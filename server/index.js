@@ -30,7 +30,7 @@ cloudinary.config({
 
 const salt = bcrypt.genSaltSync(10);
 
-app.use(cors({ credentials: true, origin: 'http://localhost:3000' }));
+app.use(cors({ credentials: true, origin: 'https://theblognest.netlify.app' }));
 app.use(express.json());
 app.use(cookieParser());
 app.use('/uploads', express.static(`${__dirname}/uploads`));
@@ -192,6 +192,7 @@ app.get('/post/:id', async (req, res) => {
 });
 
 app.listen(4000);
+// app.listen(`https://blognest-6go9.onrender.com`);
 
 
 
