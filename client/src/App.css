@@ -47,8 +47,18 @@ div.post{
 @media screen and (min-width: 700px) {
   div.post{
       grid-template-columns: .9fr 1.1fr;
+
   }
 }
+
+@media screen and (max-width: 700px) {
+  div.post{
+      border-bottom: 1px solid black;
+
+  }
+}
+
+
 .texts{
   font-family: 'Roboto';
 }
@@ -95,11 +105,16 @@ form.login, form.register{
   cursor: pointer;
   width: 100%;
   display: block;
-  background-color: #555;
+  /* background-color: #555; */
+  background-color: #9c27b0;
   border:0;
   color: #fff;
   border-radius: 5px;
   padding: 9px 0;
+}
+
+.createbutton:hover{
+  background-color: #8a259c;
 }
 
 /* input{
@@ -170,6 +185,7 @@ div.edit-row{
 }
 div.post-page a.edit-btn{
   background-color: #333;
+  background-color: #9c27b0;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -178,6 +194,11 @@ div.post-page a.edit-btn{
   border-radius: 5px;
   text-decoration: none;
 }
+
+div.post-page a.edit-btn:hover{
+  background-color: #8a259c;
+}
+
 a svg{
   height:20px;
 }

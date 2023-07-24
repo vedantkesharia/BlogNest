@@ -1,4 +1,4 @@
-import {Link,useNavigate} from "react-router-dom";
+import {Link,redirect,useNavigate} from "react-router-dom";
 import {useContext, useEffect, useState} from "react";
 import {UserContext} from "./UserContext";
 export default function Header(){
@@ -25,7 +25,8 @@ export default function Header(){
       method: 'POST',
     });
     setUserInfo(null);
-
+    navigate("/");
+    window.location.reload();
   }
 
   const username = userInfo?.username;
