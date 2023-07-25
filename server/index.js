@@ -30,7 +30,8 @@ cloudinary.config({
 
 const salt = bcrypt.genSaltSync(10);
 
-app.use(cors({ credentials: true, origin: 'http://localhost:3000' }));
+// app.use(cors({ credentials: true, origin: 'http://localhost:3000' }));
+app.use(cors());
 app.use(express.json());
 app.use(cookieParser());
 app.use('/uploads', express.static(`${__dirname}/uploads`));
@@ -81,7 +82,9 @@ app.post('/logout', (req, res) => {
   res.cookie('token', '').json('ok');
 });
 
-app.post('/post', uploadMiddleware.single('file'), async (req, res) => {
+// , uploadMiddleware.single('file')
+
+app.post('/post', async (req, res) => {
   const { originalname, path } = req.file;
   const parts = originalname.split('.');
   const ext = parts[parts.length - 1];
@@ -120,7 +123,7 @@ app.post('/post', uploadMiddleware.single('file'), async (req, res) => {
   });
 });
 
-app.put('/post', uploadMiddleware.single('file'), async (req, res) => {
+app.put('/post', async (req, res) => {
   let newPath = null;
   let ext = null; // Declare ext variable outside the if block
   if (req.file) {
@@ -192,7 +195,6 @@ app.get('/post/:id', async (req, res) => {
 });
 
 app.listen(4000);
-// app.listen(`https://blognest-6go9.onrender.com`);
 
 
 
